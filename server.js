@@ -1,11 +1,6 @@
 import express from "express";
 import cors from "cors";
 import puppeteer from "puppeteer";
-
-import lighthouse from "lighthouse";
-import express from "express";
-import cors from "cors";
-import puppeteer from "puppeteer";
 import lighthouse from "lighthouse";
 
 const app = express();
@@ -14,93 +9,48 @@ app.use(cors());
 app.use(express.json());
 app.use("/screenshots", express.static("screenshots"));
 
+/* =========================
+   ANALISIS CON LIGHTHOUSE
+========================= */
 async function analizarSitio(url) {
 
     const browser = await puppeteer.launch({
         headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage"
+        ]
     });
 
-    const { port } = new URL(browser.wsEndpoint());
+    const ws = browser.wsEndpoint();
+    const port = new URL(ws).port;
 
-    const options = {
-        logLevel: "info",
+    const result = await lighthouse(url, {
+        port,
         output: "json",
-        port
-    };
+        logLevel: "silent"
+    });
 
-    const result = await lighthouse(url, options);
-
-    const report = result.lhr;
+    const lhr = result.lhr;
 
     await browser.close();
 
     return {
-        performance: Math.round(report.categories.performance.score * 100),
-        seo: Math.round(report.categories.seo.score * 100),
-        accessibility: Math.round(report.categories.accessibility.score * 100),
-        bestPractices: Math.round(report.categories["best-practices"].score * 100)
+        performance: Math.round(lhr.categories.performance.score * 100),
+        seo: Math.round(lhr.categories.seo.score * 100),
+        accessibility: Math.round(lhr.categories.accessibility.score * 100),
+        bestPractices: Math.round(lhr.categories["best-practices"].score * 100)
     };
 }
 
-app.use(cors());
-
-app.use("/screenshots", express.static("screenshots"));
-
-app.use(express.json());
-
-async function analizarSitio(url) {
-
-    const chrome = await chromeLauncher.launch({
-
-        chromeFlags: [
-            "--headless",
-            "--no-sandbox",
-            "--disable-setuid-sandbox"
-        ]
-    });
-
-    const options = {
-
-        logLevel: "info",
-
-        output: "json",
-
-        port: chrome.port
-    };
-
-    const runnerResult = await lighthouse(url, options);
-
-    const report = runnerResult.lhr;
-
-    await chrome.kill();
-
-    return {
-
-        performance: Math.round(
-            report.categories.performance.score * 100
-        ),
-
-        seo: Math.round(
-            report.categories.seo.score * 100
-        ),
-
-        accessibility: Math.round(
-            report.categories.accessibility.score * 100
-        ),
-
-        bestPractices: Math.round(
-            report.categories["best-practices"].score * 100
-        )
-    };
-}
-
-async function tomarScreenshot(url){
+/* =========================
+   SCREENSHOT
+========================= */
+async function tomarScreenshot(url) {
 
     const browser = await puppeteer.launch({
-
         headless: "new",
-
         args: [
             "--no-sandbox",
             "--disable-setuid-sandbox"
@@ -110,18 +60,14 @@ async function tomarScreenshot(url){
     const page = await browser.newPage();
 
     await page.goto(url, {
-
         waitUntil: "networkidle2"
     });
 
     const nombreArchivo = `screenshot-${Date.now()}.png`;
-
     const ruta = `screenshots/${nombreArchivo}`;
 
     await page.screenshot({
-
         path: ruta,
-
         fullPage: true
     });
 
@@ -130,79 +76,45 @@ async function tomarScreenshot(url){
     return nombreArchivo;
 }
 
-function generarAnalisis(resultado){
+/* =========================
+   RECOMENDACIONES
+========================= */
+function generarAnalisis(resultado) {
 
     let recomendaciones = [];
 
-    // PERFORMANCE
-
-    if(resultado.performance < 50){
-
-        recomendaciones.push(
-            "⚡ El rendimiento es bajo. Optimiza imágenes y reduce scripts pesados."
-        );
-
-    } else if(resultado.performance < 80){
-
-        recomendaciones.push(
-            "⚡ El rendimiento es aceptable, pero todavía puede mejorar."
-        );
-
+    if (resultado.performance < 50) {
+        recomendaciones.push("⚡ Rendimiento bajo. Optimiza imágenes y scripts.");
+    } else if (resultado.performance < 80) {
+        recomendaciones.push("⚡ Rendimiento aceptable, pero mejorable.");
     } else {
-
-        recomendaciones.push(
-            "⚡ Excelente rendimiento general."
-        );
+        recomendaciones.push("⚡ Excelente rendimiento.");
     }
 
-    // SEO
-
-    if(resultado.seo < 70){
-
-        recomendaciones.push(
-            "🔍 El SEO necesita mejoras en meta etiquetas y estructura."
-        );
-
+    if (resultado.seo < 70) {
+        recomendaciones.push("🔍 SEO necesita mejoras en meta etiquetas.");
     } else {
-
-        recomendaciones.push(
-            "🔍 Buen nivel de SEO."
-        );
+        recomendaciones.push("🔍 Buen SEO.");
     }
 
-    // ACCESSIBILITY
-
-    if(resultado.accessibility < 70){
-
-        recomendaciones.push(
-            "♿ Hay problemas de accesibilidad para algunos usuarios."
-        );
-
+    if (resultado.accessibility < 70) {
+        recomendaciones.push("♿ Problemas de accesibilidad detectados.");
     } else {
-
-        recomendaciones.push(
-            "♿ Buena accesibilidad."
-        );
+        recomendaciones.push("♿ Buena accesibilidad.");
     }
 
-    // BEST PRACTICES
-
-    if(resultado.bestPractices < 70){
-
-        recomendaciones.push(
-            "✅ Algunas buenas prácticas de seguridad y desarrollo faltan."
-        );
-
+    if (resultado.bestPractices < 70) {
+        recomendaciones.push("✅ Faltan buenas prácticas.");
     } else {
-
-        recomendaciones.push(
-            "✅ Buenas prácticas correctas."
-        );
+        recomendaciones.push("✅ Buenas prácticas correctas.");
     }
 
     return recomendaciones;
 }
 
+/* =========================
+   ENDPOINT
+========================= */
 app.post("/analizar", async (req, res) => {
 
     try {
@@ -210,17 +122,12 @@ app.post("/analizar", async (req, res) => {
         const { url } = req.body;
 
         const resultado = await analizarSitio(url);
-
         const screenshot = await tomarScreenshot(url);
-
         const recomendaciones = generarAnalisis(resultado);
 
         res.json({
-
             ...resultado,
-
             recomendaciones,
-
             screenshot
         });
 
@@ -229,15 +136,16 @@ app.post("/analizar", async (req, res) => {
         console.log(error);
 
         res.status(500).json({
-
             error: "Error analizando sitio"
         });
     }
 });
 
+/* =========================
+   START SERVER
+========================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-
     console.log(`Servidor funcionando en puerto ${PORT}`);
 });
