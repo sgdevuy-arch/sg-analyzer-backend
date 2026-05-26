@@ -3,9 +3,45 @@ import cors from "cors";
 import puppeteer from "puppeteer";
 
 import lighthouse from "lighthouse";
-import * as chromeLauncher from "chrome-launcher";
+import express from "express";
+import cors from "cors";
+import puppeteer from "puppeteer";
+import lighthouse from "lighthouse";
 
 const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use("/screenshots", express.static("screenshots"));
+
+async function analizarSitio(url) {
+
+    const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const { port } = new URL(browser.wsEndpoint());
+
+    const options = {
+        logLevel: "info",
+        output: "json",
+        port
+    };
+
+    const result = await lighthouse(url, options);
+
+    const report = result.lhr;
+
+    await browser.close();
+
+    return {
+        performance: Math.round(report.categories.performance.score * 100),
+        seo: Math.round(report.categories.seo.score * 100),
+        accessibility: Math.round(report.categories.accessibility.score * 100),
+        bestPractices: Math.round(report.categories["best-practices"].score * 100)
+    };
+}
 
 app.use(cors());
 
