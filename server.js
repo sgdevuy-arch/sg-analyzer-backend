@@ -8,27 +8,37 @@ import * as chromeLauncher from "chrome-launcher";
 const app = express();
 
 app.use(cors());
+
 app.use("/screenshots", express.static("screenshots"));
+
 app.use(express.json());
 
 async function analizarSitio(url) {
 
     const chrome = await chromeLauncher.launch({
-        chromeFlags: ["--headless"]
+
+        chromeFlags: [
+            "--headless",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--disable-dev-shm-usage"
+        ]
     });
 
     const options = {
+
         logLevel: "info",
+
         output: "json",
+
         port: chrome.port
-        
     };
 
     const runnerResult = await lighthouse(url, options);
 
     const report = runnerResult.lhr;
 
-    //await chrome.kill();
+    await chrome.kill();
 
     return {
 
@@ -49,12 +59,17 @@ async function analizarSitio(url) {
         )
     };
 }
+
 async function tomarScreenshot(url){
 
     const browser = await puppeteer.launch({
 
-        headless: true
+        headless: true,
 
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox"
+        ]
     });
 
     const page = await browser.newPage();
@@ -79,11 +94,10 @@ async function tomarScreenshot(url){
 
     return nombreArchivo;
 }
+
 function generarAnalisis(resultado){
 
     let recomendaciones = [];
-
-    // PERFORMANCE
 
     if(resultado.performance < 50){
 
@@ -104,8 +118,6 @@ function generarAnalisis(resultado){
         );
     }
 
-    // SEO
-
     if(resultado.seo < 70){
 
         recomendaciones.push(
@@ -119,8 +131,6 @@ function generarAnalisis(resultado){
         );
     }
 
-    // ACCESSIBILITY
-
     if(resultado.accessibility < 70){
 
         recomendaciones.push(
@@ -133,8 +143,6 @@ function generarAnalisis(resultado){
             "♿ Buena accesibilidad."
         );
     }
-
-    // BEST PRACTICES
 
     if(resultado.bestPractices < 70){
 
@@ -159,27 +167,34 @@ app.post("/analizar", async (req, res) => {
         const { url } = req.body;
 
         const resultado = await analizarSitio(url);
+
         const screenshot = await tomarScreenshot(url);
 
-const recomendaciones = generarAnalisis(resultado);
+        const recomendaciones = generarAnalisis(resultado);
 
-res.json({
-    ...resultado,
-    recomendaciones,
-    screenshot
-});
+        res.json({
+
+            ...resultado,
+
+            recomendaciones,
+
+            screenshot
+        });
+
     } catch (error) {
 
         console.log(error);
 
         res.status(500).json({
+
             error: "Error analizando sitio"
         });
     }
 });
 
-app.listen(3000, () => {
+const PORT = process.env.PORT || 3000;
 
-    console.log("Servidor funcionando en puerto 3000");
+app.listen(PORT, () => {
+
+    console.log(`Servidor funcionando en puerto ${PORT}`);
 });
-//node server.js
