@@ -20,8 +20,7 @@ async function analizarSitio(url) {
         chromeFlags: [
             "--headless",
             "--no-sandbox",
-            "--disable-gpu",
-            "--disable-dev-shm-usage"
+            "--disable-setuid-sandbox"
         ]
     });
 
@@ -64,7 +63,7 @@ async function tomarScreenshot(url){
 
     const browser = await puppeteer.launch({
 
-        headless: true,
+        headless: "new",
 
         args: [
             "--no-sandbox",
@@ -99,6 +98,8 @@ function generarAnalisis(resultado){
 
     let recomendaciones = [];
 
+    // PERFORMANCE
+
     if(resultado.performance < 50){
 
         recomendaciones.push(
@@ -118,6 +119,8 @@ function generarAnalisis(resultado){
         );
     }
 
+    // SEO
+
     if(resultado.seo < 70){
 
         recomendaciones.push(
@@ -131,6 +134,8 @@ function generarAnalisis(resultado){
         );
     }
 
+    // ACCESSIBILITY
+
     if(resultado.accessibility < 70){
 
         recomendaciones.push(
@@ -143,6 +148,8 @@ function generarAnalisis(resultado){
             "♿ Buena accesibilidad."
         );
     }
+
+    // BEST PRACTICES
 
     if(resultado.bestPractices < 70){
 
